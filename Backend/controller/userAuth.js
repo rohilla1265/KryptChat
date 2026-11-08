@@ -3,25 +3,83 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import validate from "../utils/validate.js";
 import redisClient from "../config/redis.js";
+import nodemailer from "nodemailer"; // 👈 Nodemailer import karein
 
-export const register = async (req, res) => {
+// Nodemailer Transporter Setup
+const transporter = nodemailer.createTransport({
+    host: process.env.EMAIL_HOST || "smtp.gmail.com",
+    port: process.env.EMAIL_PORT || 587,
+    secure: false,
+    auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+    },
+});
+
+// Helper for 6-digit OTP
+const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
+
+// 1. Send OTP for Signup (Controller function)
+export const sendSignupOTP = async (req, res) => {
   try {
     validate(req.body);
     const { email, password } = req.body;
 
-    // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return res
-        .status(400)
-        .json({ message: "User already exists with this email" });
+      return res.status(400).json({ message: "User already exists with this email" });
     }
 
+    const otp = generateOTP();
     const hashedPassword = await bcrypt.hash(password, 10);
-    const newUser = await User.create({
-      ...req.body,
-      password: hashedPassword,
+    const userData = { ...req.body, password: hashedPassword };
+
+    // Redis mein OTP aur temporary user data save karein (5 mins expiry)
+    await redisClient.set(`otp:${email}`, JSON.stringify({ otp, userData }));
+    await redisClient.expire(`otp:${email}`, 300);
+
+    // Email bhejein
+    await transporter.sendMail({
+      from: `"Krypt Secure" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: 'Your Signup Verification OTP',
+      html: `
+          <div style="font-family: Arial, sans-serif; padding: 20px;">
+              <h2>Krypt_Secure Verification</h2>
+              <p>Your one-time verification code for registration is:</p>
+              <h1 style="color: #10b981; letter-spacing: 2px;">${otp}</h1>
+              <p>This code will expire in <strong>5 minutes</strong>.</p>
+          </div>
+      `,
     });
+
+    return res.status(200).json({ message: "OTP sent successfully to your email" });
+  } catch (e) {
+    return res.status(400).json({ message: "Error: " + e.message });
+  }
+};
+
+// 2. Verify OTP & Register User (Controller function)
+export const verifySignupOTP = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+    if (!email || !otp) {
+      return res.status(400).json({ message: "Email and OTP are required" });
+    }
+
+    const recordData = await redisClient.get(`otp:${email}`);
+    if (!recordData) {
+      return res.status(400).json({ message: "OTP expired or invalid request" });
+    }
+
+    const { otp: storedOtp, userData } = JSON.parse(recordData);
+
+    if (storedOtp !== otp) {
+      return res.status(400).json({ message: "Invalid OTP code" });
+    }
+
+    // OTP match ho gaya, ab User ko Database mein create karein
+    const newUser = await User.create(userData);
 
     const reply = {
       firstname: newUser.firstname,
@@ -39,19 +97,21 @@ export const register = async (req, res) => {
     res.cookie("token", token, {
       httpOnly: true,
       maxAge: 3600000,
-      secure: false, // Localhost par false hona chahiye (agar HTTPS nahi hai)
+      secure: false,
       sameSite: "lax",
     });
+
+    // Clear OTP from redis
+    await redisClient.del(`otp:${email}`);
 
     return res.status(201).json({
       user: reply,
       message: "User registered successfully",
     });
-  } catch (e) {
-    return res.status(400).json({ message: "Error: " + e.message });
+  } catch (err) {
+    return res.status(500).json({ message: "Error: " + err.message });
   }
 };
-
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
