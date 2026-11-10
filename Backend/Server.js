@@ -51,11 +51,13 @@ const app = express();
 // 2. CORS ko sabse upar rakho taaki credentials/cookies properly allow ho sakein
 app.use(
   cors({
-    origin: 'https://kryptchat-0k6b.onrender.com',
+    origin: [
+      'http://localhost:5173', 
+      'https://kryptchat-0k6b.onrender.com'
+    ],
     credentials: true,
   })
 );
-
 // 3. Baaki middlewares
 app.use(express.json());
 app.use(cookieParser());
@@ -71,7 +73,10 @@ app.use('/api/messages', messageRouter);
 const server = createServer(app);
 const io = new Server(server, {
     cors: {
-      origin: 'https://kryptchat-0k6b.onrender.com',
+      origin: [
+      'http://localhost:5173', 
+      'https://kryptchat-0k6b.onrender.com'
+    ],
       credentials: true,                
     }
 });

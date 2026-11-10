@@ -7,17 +7,18 @@ import nodemailer from "nodemailer"; // 👈 Nodemailer import karein
 
 // Nodemailer Transporter Setup
 const transporter = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST || "smtp.gmail.com",
-    port: process.env.EMAIL_PORT || 587,
-    secure: false,
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-    },
+  host: process.env.EMAIL_HOST || "smtp.gmail.com",
+  port: process.env.EMAIL_PORT || 587,
+  secure: false,
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
 });
 
 // Helper for 6-digit OTP
-const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
+const generateOTP = () =>
+  Math.floor(100000 + Math.random() * 900000).toString();
 
 // 1. Send OTP for Signup (Controller function)
 export const sendSignupOTP = async (req, res) => {
@@ -27,7 +28,9 @@ export const sendSignupOTP = async (req, res) => {
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return res.status(400).json({ message: "User already exists with this email" });
+      return res
+        .status(400)
+        .json({ message: "User already exists with this email" });
     }
 
     const otp = generateOTP();
@@ -42,7 +45,7 @@ export const sendSignupOTP = async (req, res) => {
     await transporter.sendMail({
       from: `"Krypt Secure" <${process.env.EMAIL_USER}>`,
       to: email,
-      subject: 'Your Signup Verification OTP',
+      subject: "Your Signup Verification OTP",
       html: `
           <div style="font-family: Arial, sans-serif; padding: 20px;">
               <h2>Krypt_Secure Verification</h2>
@@ -53,7 +56,9 @@ export const sendSignupOTP = async (req, res) => {
       `,
     });
 
-    return res.status(200).json({ message: "OTP sent successfully to your email" });
+    return res
+      .status(200)
+      .json({ message: "OTP sent successfully to your email" });
   } catch (e) {
     return res.status(400).json({ message: "Error: " + e.message });
   }
@@ -69,7 +74,9 @@ export const verifySignupOTP = async (req, res) => {
 
     const recordData = await redisClient.get(`otp:${email}`);
     if (!recordData) {
-      return res.status(400).json({ message: "OTP expired or invalid request" });
+      return res
+        .status(400)
+        .json({ message: "OTP expired or invalid request" });
     }
 
     const { otp: storedOtp, userData } = JSON.parse(recordData);
@@ -96,9 +103,8 @@ export const verifySignupOTP = async (req, res) => {
 
     res.cookie("token", token, {
       httpOnly: true,
-      maxAge: 3600000,
-      secure: false,
-      sameSite: "lax",
+      secure: true, 
+      sameSite: "none",
     });
 
     // Clear OTP from redis

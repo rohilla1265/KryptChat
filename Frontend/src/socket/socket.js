@@ -1,9 +1,13 @@
 import { io } from 'socket.io-client';
 
-// Socket ko permanently autoConnect: true kar diya hai taaki automatic connection bane[cite: 13]
-const socket = io('https://kryptchatbackend.onrender.com/', {
+// Environment ke hisaab se URL automatically switch ho jayega
+const SOCKET_URL = window.location.hostname === 'localhost'
+  ? 'http://localhost:5000'
+  : 'https://kryptchatbackend.onrender.com'; // 👈 Aapka live Render backend URL
+
+const socket = io(SOCKET_URL, {
   autoConnect: true,
-  withCredentials: true, // 👈 Cookies bhejne ke liye
+  withCredentials: true, // 👈 Cookies (authentication) bhejne ke liye
   transports: ['websocket', 'polling']
 });
 
