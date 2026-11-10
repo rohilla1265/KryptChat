@@ -153,7 +153,7 @@ export const login = async (req, res) => {
       httpOnly: true,
       maxAge: 7 * 24 * 60 * 60 * 1000,
       secure: false, // Localhost par false hona chahiye (agar HTTPS nahi hai)
-      sameSite: "lax",
+      sameSite: "none",
     });
 
     return res.status(200).json({
